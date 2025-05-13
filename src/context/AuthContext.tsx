@@ -37,43 +37,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        checkUser();
-      } else {
-        setUser(null);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, []);
 
   const checkUser = async () => {
+    setLoading(true);
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', authUser.id)
-          .single();
-
-        if (userError) throw userError;
-        if (userData) {
-          setUser({
-            id: userData.id,
-            name: userData.name,
-            email: userData.email,
-            password: userData.password,
-            age: userData.age,
-            location: userData.location,
-            isAdmin: userData.is_admin
-          });
-        }
-      }
+      const { data } = await supabase.from('users').select('*').maybeSingle();
+      if (data) setUser({ ...data, isAdmin: data.is_admin });
     } catch (err) {
       console.error('Error checking user:', err);
     } finally {
@@ -94,19 +64,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) throw error;
       if (!data) throw new Error('Signup failed. No user data returned.');
-      setUser({ 
-        id: data.id, 
-        name, 
-        email, 
-        password, 
-        age, 
-        location, 
-        isAdmin: false 
-      });
-      
-      
+
+      setUser({ ...data, isAdmin: data.is_admin });
     } catch (err) {
-      console.error('Signup error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred during signup');
       throw err;
     } finally {
@@ -124,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select('*')
         .eq('email', email)
         .eq('password', password)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       if (!data) throw new Error('Invalid email or password');
