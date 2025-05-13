@@ -1,31 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { Tables } from '../../lib/supabase';
+import { useDestinations } from '../../hooks/useDestinations';
 
 interface Props {
   package?: Tables['packages'];
-  destinationId: string;
+  destinationId?: string;
   onClose: () => void;
   onSave: (pkg: Omit<Tables['packages'], 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
 }
 
-export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destinationId, onClose, onSave }) => {
+export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destinationId: initialDestinationId, onClose, onSave }) => {
   const [title, setTitle] = useState(pkg?.title || '');
   const [description, setDescription] = useState(pkg?.description || '');
   const [duration, setDuration] = useState(pkg?.duration?.toString() || '');
   const [price, setPrice] = useState(pkg?.price?.toString() || '');
   const [mainImageUrl, setMainImageUrl] = useState(pkg?.main_image_url || '');
+  const [selectedDestinationId, setSelectedDestinationId] = useState(initialDestinationId || pkg?.destination_id || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const { destinations } = useDestinations();
+
+  useEffect(() => {
+    if (!selectedDestinationId && destinations.length > 0) {
+      setSelectedDestinationId(destinations[0].id);
+    }
+  }, [destinations]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
+    if (!selectedDestinationId) {
+      setError('Please select a destination');
+      setLoading(false);
+      return;
+    }
+
     try {
       await onSave({
-        destination_id: destinationId,
+        destination_id: selectedDestinationId,
         title,
         description,
         duration: parseInt(duration),
@@ -61,6 +77,25 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Destination
+              </label>
+              <select
+                value={selectedDestinationId}
+                onChange={(e) => setSelectedDestinationId(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-lg"
+                required
+              >
+                <option value="">Select destination</option>
+                {destinations.map((dest) => (
+                  <option key={dest.id} value={dest.id}>
+                    {dest.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Title

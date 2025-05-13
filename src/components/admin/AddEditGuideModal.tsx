@@ -1,23 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { Tables } from '../../lib/supabase';
+import { useDestinations } from '../../hooks/useDestinations';
 
 interface Props {
   guide?: Tables['guides'];
-  destinationId: string;
+  destinationId?: string;
   onClose: () => void;
   onSave: (guide: Omit<Tables['guides'], 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
 }
 
-export const AddEditGuideModal: React.FC<Props> = ({ guide, destinationId, onClose, onSave }) => {
+export const AddEditGuideModal: React.FC<Props> = ({ guide, destinationId: initialDestinationId, onClose, onSave }) => {
   const [name, setName] = useState(guide?.name || '');
   const [email, setEmail] = useState(guide?.email || '');
   const [experienceYears, setExperienceYears] = useState(guide?.experience_years?.toString() || '');
   const [languages, setLanguages] = useState<string[]>(guide?.languages || []);
   const [pricePerDay, setPricePerDay] = useState(guide?.price_per_day?.toString() || '');
   const [imageUrl, setImageUrl] = useState(guide?.image_url || '');
+  const [selectedDestinationId, setSelectedDestinationId] = useState(initialDestinationId || guide?.destination_id || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const { destinations } = useDestinations();
+
+  useEffect(() => {
+    if (!selectedDestinationId && destinations.length > 0) {
+      setSelectedDestinationId(destinations[0].id);
+    }
+  }, [destinations]);
 
   const handleLanguageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -29,9 +39,15 @@ export const AddEditGuideModal: React.FC<Props> = ({ guide, destinationId, onClo
     setError('');
     setLoading(true);
 
+    if (!selectedDestinationId) {
+      setError('Please select a destination');
+      setLoading(false);
+      return;
+    }
+
     try {
       await onSave({
-        destination_id: destinationId,
+        destination_id: selectedDestinationId,
         name,
         email,
         experience_years: parseInt(experienceYears),
@@ -68,6 +84,25 @@ export const AddEditGuideModal: React.FC<Props> = ({ guide, destinationId, onClo
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Destination
+              </label>
+              <select
+                value={selectedDestinationId}
+                onChange={(e) => setSelectedDestinationId(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-lg"
+                required
+              >
+                <option value="">Select destination</option>
+                {destinations.map((dest) => (
+                  <option key={dest.id} value={dest.id}>
+                    {dest.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Name

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 interface User {
   id: string;
@@ -34,45 +35,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if user is logged in (from localStorage in this mock version)
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    checkUser();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    setLoading(true);
-    setError(null);
-    
+  const checkUser = async () => {
     try {
-      // Mock login - in a real app, this would be an API call
-      if (email === 'admin@example.com' && password === 'password') {
-        const adminUser = {
-          id: '123e4567-e89b-12d3-a456-426614174000', // UUID format for admin
-          name: 'Admin User',
-          email: 'admin@example.com',
-          isAdmin: true,
-        };
-        setUser(adminUser);
-        localStorage.setItem('user', JSON.stringify(adminUser));
-      } else if (email === 'user@example.com' && password === 'password') {
-        const regularUser = {
-          id: '123e4567-e89b-12d3-a456-426614174001', // UUID format for regular user
-          name: 'John Doe',
-          email: 'user@example.com',
-          age: 30,
-          location: 'New York',
-          isAdmin: false,
-        };
-        setUser(regularUser);
-        localStorage.setItem('user', JSON.stringify(regularUser));
-      } else {
-        throw new Error('Invalid email or password');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (userData) {
+          setUser({
+            id: userData.id,
+            name: userData.name,
+            email: userData.email,
+            age: userData.age,
+            location: userData.location,
+            isAdmin: userData.is_admin
+          });
+        }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred during login');
+      console.error('Error checking user:', err);
     } finally {
       setLoading(false);
     }
@@ -83,28 +71,84 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      // Mock signup - in a real app, this would be an API call
-      const newUser = {
-        id: crypto.randomUUID(), // Generate a proper UUID for new users
+      const { data: { user: authUser }, error: authError } = await supabase.auth.signUp({
+        email,
+        password
+      });
+
+      if (authError) throw authError;
+      if (!authUser?.id) throw new Error('No user ID returned from signup');
+
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert([{
+          id: authUser.id,
+          name,
+          email,
+          age,
+          location,
+          is_admin: false
+        }]);
+
+      if (profileError) throw profileError;
+
+      setUser({
+        id: authUser.id,
         name,
         email,
         age,
         location,
-        isAdmin: false,
-      };
-      
-      setUser(newUser);
-      localStorage.setItem('user', JSON.stringify(newUser));
+        isAdmin: false
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during signup');
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const logout = () => {
+  const login = async (email: string, password: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (authError) throw authError;
+      if (!authUser?.id) throw new Error('No user ID returned from login');
+
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+
+      if (userError) throw userError;
+      if (!userData) throw new Error('User profile not found');
+
+      setUser({
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        age: userData.age,
+        location: userData.location,
+        isAdmin: userData.is_admin
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Invalid email or password');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('user');
   };
 
   const value = {
