@@ -18,8 +18,8 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
   const [price, setPrice] = useState(pkg?.price?.toString() || '');
   const [mainImageUrl, setMainImageUrl] = useState(pkg?.main_image_url || '');
   const [selectedDestinationId, setSelectedDestinationId] = useState(initialDestinationId || pkg?.destination_id || '');
-  const [itinerary, setItinerary] = useState<Array<{ day: number; description: string }>>([]);
-  const [availablePlaces, setAvailablePlaces] = useState<Tables['places'][]>([]);
+  const [itinerary, setItinerary] = useState(pkg?.itinerary || '');
+  const [availablePlaces, setAvailablePlaces] = useState<Tables['destination_places'][]>([]);
   const [selectedPlaces, setSelectedPlaces] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -32,28 +32,10 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
     }
   }, [selectedDestinationId]);
 
-  useEffect(() => {
-    if (duration) {
-      const days = parseInt(duration);
-      setItinerary(prev => {
-        const newItinerary = [...prev];
-        // Add or remove days based on duration
-        if (newItinerary.length < days) {
-          for (let i = newItinerary.length + 1; i <= days; i++) {
-            newItinerary.push({ day: i, description: '' });
-          }
-        } else if (newItinerary.length > days) {
-          return newItinerary.slice(0, days);
-        }
-        return newItinerary;
-      });
-    }
-  }, [duration]);
-
   const fetchPlaces = async () => {
     try {
       const { data, error } = await supabase
-        .from('places')
+        .from('destination_places')
         .select('*')
         .eq('destination_id', selectedDestinationId);
 
@@ -75,12 +57,6 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
       return;
     }
 
-    if (itinerary.some(day => !day.description.trim())) {
-      setError('Please provide description for all days');
-      setLoading(false);
-      return;
-    }
-
     try {
       const packageData = {
         destination_id: selectedDestinationId,
@@ -89,7 +65,8 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
         duration: parseInt(duration),
         price: parseFloat(price),
         rating: pkg?.rating || 0,
-        main_image_url: mainImageUrl
+        main_image_url: mainImageUrl,
+        itinerary
       };
 
       await onSave(packageData);
@@ -99,14 +76,6 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleItineraryChange = (day: number, description: string) => {
-    setItinerary(prev => 
-      prev.map(item => 
-        item.day === day ? { ...item, description } : item
-      )
-    );
   };
 
   const handlePlaceToggle = (placeId: string) => {
@@ -226,6 +195,20 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Itinerary
+            </label>
+            <textarea
+              value={itinerary}
+              onChange={(e) => setItinerary(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+              rows={5}
+              placeholder="Day-by-day itinerary details..."
+              required
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
               Places Included
             </label>
@@ -250,29 +233,6 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
                       <div className="font-medium">{place.name}</div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Day-by-Day Itinerary
-            </label>
-            <div className="space-y-4">
-              {itinerary.map((day) => (
-                <div key={day.day} className="border rounded-lg p-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Day {day.day}
-                  </label>
-                  <textarea
-                    value={day.description}
-                    onChange={(e) => handleItineraryChange(day.day, e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-lg"
-                    rows={2}
-                    placeholder={`Describe the activities for day ${day.day}`}
-                    required
-                  />
                 </div>
               ))}
             </div>

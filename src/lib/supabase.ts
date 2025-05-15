@@ -31,7 +31,7 @@ export type Tables = {
     created_at: string;
     updated_at: string;
   };
-  places: {
+  destination_places: {
     id: string;
     destination_id: string;
     name: string;
@@ -49,6 +49,7 @@ export type Tables = {
     price: number;
     rating: number;
     main_image_url?: string;
+    itinerary?: string;
     created_at: string;
     updated_at: string;
   };
