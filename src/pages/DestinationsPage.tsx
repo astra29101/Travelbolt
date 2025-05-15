@@ -1,9 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MapPin, Search } from 'lucide-react';
+import { MapPin, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { useDestinations } from '../hooks/useDestinations';
+import { supabase } from '../lib/supabase';
 
 const categories = ['All', 'Beaches', 'Mountains', 'Historical', 'Nature'];
+
+interface DestinationPlace {
+  id: string;
+  name: string;
+  description: string;
+  image_url: string;
+}
 
 const DestinationsPage: React.FC = () => {
   const location = useLocation();
@@ -13,6 +21,8 @@ const DestinationsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState(searchParam);
   const [activeCategory, setActiveCategory] = useState('All');
   const [filteredDestinations, setFilteredDestinations] = useState<any[]>([]);
+  const [expandedDestination, setExpandedDestination] = useState<string | null>(null);
+  const [destinationPlaces, setDestinationPlaces] = useState<Record<string, DestinationPlace[]>>({});
   
   const { destinations, loading, error } = useDestinations();
 
@@ -34,6 +44,34 @@ const DestinationsPage: React.FC = () => {
 
     setFilteredDestinations(filtered);
   }, [searchQuery, activeCategory, destinations]);
+
+  const fetchDestinationPlaces = async (destinationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('destination_places')
+        .select('*')
+        .eq('destination_id', destinationId);
+
+      if (error) throw error;
+      setDestinationPlaces(prev => ({
+        ...prev,
+        [destinationId]: data || []
+      }));
+    } catch (err) {
+      console.error('Error fetching destination places:', err);
+    }
+  };
+
+  const handleExpandDestination = (destinationId: string) => {
+    if (expandedDestination === destinationId) {
+      setExpandedDestination(null);
+    } else {
+      setExpandedDestination(destinationId);
+      if (!destinationPlaces[destinationId]) {
+        fetchDestinationPlaces(destinationId);
+      }
+    }
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,40 +147,85 @@ const DestinationsPage: React.FC = () => {
         </div>
 
         {/* Destinations Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="space-y-6">
           {filteredDestinations.length > 0 ? (
             filteredDestinations.map((destination) => (
-              <Link 
-                to={`/destinations/${destination.id}`} 
+              <div 
                 key={destination.id}
-                className="group bg-white rounded-lg overflow-hidden shadow-md transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+                className="bg-white rounded-lg overflow-hidden shadow-md transition-all duration-300 hover:shadow-xl"
               >
-                <div className="relative h-64">
-                  <img 
-                    src={destination.image_url} 
-                    alt={destination.name}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute top-3 left-3 px-2 py-1 bg-cyan-600 text-white text-xs rounded-full">
-                    {destination.category}
+                <div className="grid grid-cols-1 md:grid-cols-2">
+                  <div className="relative h-64 md:h-full">
+                    <img 
+                      src={destination.image_url} 
+                      alt={destination.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-3 left-3 px-2 py-1 bg-cyan-600 text-white text-xs rounded-full">
+                      {destination.category}
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <h3 className="text-2xl font-bold text-gray-800 mb-3">
+                      {destination.name}
+                    </h3>
+                    <div className="flex items-start mb-4">
+                      <MapPin className="h-5 w-5 text-gray-500 mr-2 mt-1 flex-shrink-0" />
+                      <p className="text-gray-600">{destination.description}</p>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <Link 
+                        to={`/destinations/${destination.id}`}
+                        className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors"
+                      >
+                        View Packages
+                      </Link>
+                      <button
+                        onClick={() => handleExpandDestination(destination.id)}
+                        className="flex items-center text-cyan-600 hover:text-cyan-800"
+                      >
+                        {expandedDestination === destination.id ? (
+                          <>
+                            Hide Places
+                            <ChevronUp className="h-4 w-4 ml-1" />
+                          </>
+                        ) : (
+                          <>
+                            Show Places
+                            <ChevronDown className="h-4 w-4 ml-1" />
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div className="p-5">
-                  <h3 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-cyan-600 transition-colors">
-                    {destination.name}
-                  </h3>
-                  <div className="flex items-start mb-4">
-                    <MapPin className="h-5 w-5 text-gray-500 mr-1 mt-0.5 flex-shrink-0" />
-                    <p className="text-gray-600">{destination.description}</p>
+
+                {/* Destination Places */}
+                {expandedDestination === destination.id && (
+                  <div className="border-t border-gray-200 p-6">
+                    <h4 className="text-lg font-semibold text-gray-800 mb-4">Places to Visit</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {destinationPlaces[destination.id]?.map((place) => (
+                        <div key={place.id} className="bg-gray-50 rounded-lg overflow-hidden">
+                          <img 
+                            src={place.image_url} 
+                            alt={place.name}
+                            className="w-full h-48 object-cover"
+                          />
+                          <div className="p-4">
+                            <h5 className="font-semibold text-gray-800 mb-2">{place.name}</h5>
+                            <p className="text-sm text-gray-600">{place.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <button className="w-full py-2 text-center bg-gray-100 text-cyan-700 rounded-md hover:bg-gray-200 transition-colors font-medium">
-                    View Packages
-                  </button>
-                </div>
-              </Link>
+                )}
+              </div>
             ))
           ) : (
-            <div className="col-span-full text-center py-12">
+            <div className="text-center py-12">
               <h3 className="text-xl font-medium text-gray-700 mb-2">No destinations found</h3>
               <p className="text-gray-500">Try adjusting your search or filter criteria</p>
             </div>
