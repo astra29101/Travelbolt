@@ -9,9 +9,116 @@ import { useDestinations } from '../hooks/useDestinations';
 import { usePackages } from '../hooks/usePackages';
 import { useGuides } from '../hooks/useGuides';
 import { AddEditDestinationModal } from '../components/admin/AddEditDestinationModal';
+import { useDestinationPlaces } from '../hooks/useDestinationPlaces';
+import { AddEditDestinationPlaceModal } from '../components/admin/AddEditDestinationPlaceModal';
 import { AddEditPackageModal } from '../components/admin/AddEditPackageModal';
 import { AddEditGuideModal } from '../components/admin/AddEditGuideModal';
 
+
+
+const ManageDestinationPlaces: React.FC = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingPlace, setEditingPlace] = useState<any>(null);
+  const { places, loading, error, addPlace, updatePlace, deletePlace } = useDestinationPlaces();
+
+  const filteredPlaces = searchQuery 
+    ? places.filter(place => 
+        place.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (place.description && place.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : places;
+
+  const handleSave = async (placeData: any) => {
+    try {
+      if (editingPlace) {
+        await updatePlace(editingPlace.id, placeData);
+      } else {
+        await addPlace(placeData);
+      }
+      setShowAddModal(false);
+      setEditingPlace(null);
+    } catch (error) {
+      console.error('Error saving place:', error);
+      alert('Failed to save place');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this place?')) {
+      try {
+        await deletePlace(id);
+      } catch (error) {
+        console.error('Error deleting place:', error);
+        alert('Failed to delete place');
+      }
+    }
+  };
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Manage Destination Places</h1>
+        <button 
+          onClick={() => setShowAddModal(true)}
+          className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 flex items-center"
+        >
+          <PlusCircle className="h-5 w-5 mr-1" />
+          Add Place
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-md">
+        <div className="p-4 border-b">
+          <input
+            type="text"
+            placeholder="Search places..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 pr-4 py-2 border rounded-lg w-full"
+          />
+          <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredPlaces.map((place) => (
+                <tr key={place.id}>
+                  <td>{place.name}</td>
+                  <td>{place.description || 'No description'}</td>
+                  <td className="flex space-x-2">
+                    <button onClick={() => { setEditingPlace(place); setShowAddModal(true); }}><Edit /></button>
+                    <button onClick={() => handleDelete(place.id)}><Trash2 /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showAddModal && (
+        <AddEditDestinationPlaceModal
+          place={editingPlace}
+          destinationId={editingPlace?.destination_id || ''}
+          onClose={() => { setShowAddModal(false); setEditingPlace(null); }}
+          onSave={handleSave}
+        />
+      )}
+    </div>
+  );
+};
 // Admin Dashboard Component
 const AdminDashboard: React.FC = () => {
   const { destinations } = useDestinations();
@@ -681,6 +788,18 @@ const AdminSidebar: React.FC = () => {
         </Link>
         
         <Link 
+          to="/admin/destinationPlaces"
+          className={`flex items-center px-4 py-3 rounded-lg text-sm font-medium ${
+            isActive('/admin/destinationPlaces') 
+              ? 'bg-cyan-50 text-cyan-700' 
+              : 'text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          <User className="h-5 w-5 mr-3" />
+          Destination Places
+        </Link>
+        
+        <Link 
           to="/admin/users"
           className={`flex items-center px-4 py-3 rounded-lg text-sm font-medium ${
             isActive('/admin/users') 
@@ -739,6 +858,7 @@ const AdminPage: React.FC = () => {
               <Route path="destinations" element={<ManageDestinations />} />
               <Route path="packages" element={<ManagePackages />} />
               <Route path="guides" element={<ManageGuides />} />
+              <Route path="destinationPlaces" element={<ManageDestinationPlaces />} />
               <Route path="users" element={<div>Manage Users</div>} />
             </Routes>
           </div>
