@@ -14,13 +14,13 @@ import { AddEditDestinationPlaceModal } from '../components/admin/AddEditDestina
 import { AddEditPackageModal } from '../components/admin/AddEditPackageModal';
 import { AddEditGuideModal } from '../components/admin/AddEditGuideModal';
 
-
-
 const ManageDestinationPlaces: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingPlace, setEditingPlace] = useState<any>(null);
+  const [selectedDestinationId, setSelectedDestinationId] = useState<string>('');
   const { places, loading, error, addPlace, updatePlace, deletePlace } = useDestinationPlaces();
+  const { destinations } = useDestinations();
 
   const filteredPlaces = searchQuery 
     ? places.filter(place => 
@@ -63,7 +63,13 @@ const ManageDestinationPlaces: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Manage Destination Places</h1>
         <button 
-          onClick={() => setShowAddModal(true)}
+          onClick={() => {
+            if (!selectedDestinationId) {
+              alert('Please select a destination first');
+              return;
+            }
+            setShowAddModal(true);
+          }}
           className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 flex items-center"
         >
           <PlusCircle className="h-5 w-5 mr-1" />
@@ -73,33 +79,71 @@ const ManageDestinationPlaces: React.FC = () => {
 
       <div className="bg-white rounded-xl shadow-md">
         <div className="p-4 border-b">
-          <input
-            type="text"
-            placeholder="Search places..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-4 py-2 border rounded-lg w-full"
-          />
-          <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Search places..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-2 border rounded-lg w-full"
+              />
+              <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+            </div>
+            <div className="sm:w-64">
+              <select
+                value={selectedDestinationId}
+                onChange={(e) => setSelectedDestinationId(e.target.value)}
+                className="w-full p-2 border rounded-lg"
+              >
+                <option value="">Select a destination</option>
+                {destinations.map(destination => (
+                  <option key={destination.id} value={destination.id}>
+                    {destination.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Destination</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="bg-white divide-y divide-gray-200">
               {filteredPlaces.map((place) => (
                 <tr key={place.id}>
-                  <td>{place.name}</td>
-                  <td>{place.description || 'No description'}</td>
-                  <td className="flex space-x-2">
-                    <button onClick={() => { setEditingPlace(place); setShowAddModal(true); }}><Edit /></button>
-                    <button onClick={() => handleDelete(place.id)}><Trash2 /></button>
+                  <td className="px-6 py-4 whitespace-nowrap">{place.name}</td>
+                  <td className="px-6 py-4">{place.description || 'No description'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {destinations.find(d => d.id === place.destination_id)?.name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex space-x-2">
+                      <button 
+                        onClick={() => { 
+                          setEditingPlace(place); 
+                          setSelectedDestinationId(place.destination_id);
+                          setShowAddModal(true); 
+                        }}
+                        className="p-1 text-cyan-600 hover:text-cyan-900"
+                      >
+                        <Edit className="h-5 w-5" />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(place.id)}
+                        className="p-1 text-red-600 hover:text-red-900"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -111,14 +155,18 @@ const ManageDestinationPlaces: React.FC = () => {
       {showAddModal && (
         <AddEditDestinationPlaceModal
           place={editingPlace}
-          destinationId={editingPlace?.destination_id || ''}
-          onClose={() => { setShowAddModal(false); setEditingPlace(null); }}
+          destinationId={editingPlace?.destination_id || selectedDestinationId}
+          onClose={() => { 
+            setShowAddModal(false); 
+            setEditingPlace(null); 
+          }}
           onSave={handleSave}
         />
       )}
     </div>
   );
 };
+
 // Admin Dashboard Component
 const AdminDashboard: React.FC = () => {
   const { destinations } = useDestinations();

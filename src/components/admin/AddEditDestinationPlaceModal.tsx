@@ -19,6 +19,12 @@ export const AddEditDestinationPlaceModal: React.FC<Props> = ({ place, destinati
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!destinationId) {
+      setError('Please select a destination');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -106,9 +112,9 @@ export const AddEditDestinationPlaceModal: React.FC<Props> = ({ place, destinati
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !destinationId}
               className={`px-4 py-2 text-white rounded-lg ${
-                loading
+                loading || !destinationId
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-cyan-600 hover:bg-cyan-700'
               }`}
