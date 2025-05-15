@@ -25,6 +25,10 @@ export function useDestinationPlaces() {
 
   const addPlace = async (place: Omit<Tables['destination_places'], 'id' | 'created_at' | 'updated_at'>) => {
     try {
+      if (!place.destination_id) {
+        throw new Error('Destination ID is required');
+      }
+
       const { data, error } = await supabase
         .from('destination_places')
         .insert([place])

@@ -25,14 +25,24 @@ export const AddEditDestinationPlaceModal: React.FC<Props> = ({ place, destinati
       return;
     }
 
+    if (!name.trim()) {
+      setError('Name is required');
+      return;
+    }
+
+    if (!imageUrl.trim()) {
+      setError('Image URL is required');
+      return;
+    }
+
     setLoading(true);
 
     try {
       await onSave({
         destination_id: destinationId,
-        name,
-        description,
-        image_url: imageUrl
+        name: name.trim(),
+        description: description.trim(),
+        image_url: imageUrl.trim()
       });
       onClose();
     } catch (err) {
@@ -84,7 +94,6 @@ export const AddEditDestinationPlaceModal: React.FC<Props> = ({ place, destinati
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded-lg"
                 rows={3}
-                required
               />
             </div>
 
