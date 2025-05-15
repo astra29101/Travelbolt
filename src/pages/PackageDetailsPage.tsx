@@ -5,6 +5,19 @@ import { useAuth } from '../context/AuthContext';
 import { usePackages } from '../hooks/usePackages';
 import { useGuides } from '../hooks/useGuides';
 import { supabase } from '../lib/supabase';
+import type { Tables } from '../lib/supabase';
+
+interface DestinationPlace {
+  id: string;
+  name: string;
+  description: string;
+  image_url: string;
+}
+
+interface Itinerary {
+  day_number: number;
+  description: string;
+}
 
 const PackageDetailsPage: React.FC = () => {
   const { packageId } = useParams<{ packageId: string }>();
@@ -13,7 +26,9 @@ const PackageDetailsPage: React.FC = () => {
   const [endDate, setEndDate] = useState<string>('');
   const [activeTab, setActiveTab] = useState('overview');
   const [mainImage, setMainImage] = useState('');
-  const [itinerary, setItinerary] = useState<Array<{ day: number; description: string }>>([]);
+  const [destinationPlaces, setDestinationPlaces] = useState<DestinationPlace[]>([]);
+  const [itinerary, setItinerary] = useState<Itinerary[]>([]);
+  const [guideAvailable, setGuideAvailable] = useState(true);
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -21,7 +36,6 @@ const PackageDetailsPage: React.FC = () => {
   const { guides, loading: guidesLoading } = useGuides();
   
   const packageDetails = packages.find(p => p.id === packageId);
-  const availableGuides = guides.filter(g => g.destination_id === packageDetails?.destination_id);
 
   useEffect(() => {
     if (packageDetails && !mainImage) {
@@ -39,10 +53,36 @@ const PackageDetailsPage: React.FC = () => {
   }, [startDate, packageDetails?.duration]);
 
   useEffect(() => {
+    if (packageDetails?.destination_id) {
+      fetchDestinationPlaces();
+    }
+  }, [packageDetails?.destination_id]);
+
+  useEffect(() => {
     if (packageId) {
       fetchItinerary();
     }
   }, [packageId]);
+
+  useEffect(() => {
+    if (selectedGuide && startDate && endDate) {
+      checkGuideAvailability();
+    }
+  }, [selectedGuide, startDate, endDate]);
+
+  const fetchDestinationPlaces = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('destination_places')
+        .select('*')
+        .eq('destination_id', packageDetails?.destination_id);
+
+      if (error) throw error;
+      setDestinationPlaces(data || []);
+    } catch (err) {
+      console.error('Error fetching destination places:', err);
+    }
+  };
 
   const fetchItinerary = async () => {
     try {
@@ -53,10 +93,68 @@ const PackageDetailsPage: React.FC = () => {
         .order('day_number');
 
       if (error) throw error;
-      setItinerary(data?.map(item => ({ day: item.day_number, description: item.description })) || []);
+      setItinerary(data || []);
     } catch (err) {
       console.error('Error fetching itinerary:', err);
     }
+  };
+
+  const checkGuideAvailability = async () => {
+    try {
+      const { data: existingBookings, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('guide_id', selectedGuide)
+        .overlaps('start_date', [startDate])
+        .overlaps('end_date', [endDate]);
+
+      if (error) throw error;
+      setGuideAvailable(!existingBookings?.length);
+    } catch (err) {
+      console.error('Error checking guide availability:', err);
+    }
+  };
+
+  const handleBookNow = () => {
+    if (!startDate || !selectedGuide) {
+      alert('Please select travel dates and a guide to continue.');
+      return;
+    }
+
+    if (!guideAvailable) {
+      alert('Selected guide is not available for these dates. Please choose different dates or another guide.');
+      return;
+    }
+
+    const selectedGuideDetails = guides.find(g => g.id === selectedGuide);
+
+    const bookingData = {
+      packageId: packageDetails?.id,
+      packageTitle: packageDetails?.title,
+      guideId: selectedGuide,
+      guideName: selectedGuideDetails?.name,
+      startDate,
+      endDate,
+      totalCost: calculateTotalCost()
+    };
+
+    sessionStorage.setItem('bookingData', JSON.stringify(bookingData));
+
+    if (user) {
+      navigate('/booking-confirmation');
+    } else {
+      navigate('/login', { state: { from: '/booking-confirmation' } });
+    }
+  };
+
+  const calculateTotalCost = () => {
+    const packageCost = packageDetails?.price || 0;
+    const selectedGuideDetails = guides.find(g => g.id === selectedGuide);
+    const guideCost = selectedGuideDetails 
+      ? selectedGuideDetails.price_per_day * (packageDetails?.duration || 0)
+      : 0;
+    
+    return packageCost + guideCost;
   };
 
   if (packagesLoading || guidesLoading) {
@@ -82,42 +180,7 @@ const PackageDetailsPage: React.FC = () => {
     );
   }
 
-  const handleBookNow = () => {
-    if (!startDate || !selectedGuide) {
-      alert('Please select travel dates and a guide to continue.');
-      return;
-    }
-
-    const selectedGuideDetails = guides.find(g => g.id === selectedGuide);
-
-    const bookingData = {
-      packageId: packageDetails.id,
-      packageTitle: packageDetails.title,
-      guideId: selectedGuide,
-      guideName: selectedGuideDetails?.name,
-      startDate,
-      endDate,
-      totalCost: calculateTotalCost()
-    };
-
-    sessionStorage.setItem('bookingData', JSON.stringify(bookingData));
-
-    if (user) {
-      navigate('/booking-confirmation');
-    } else {
-      navigate('/login', { state: { from: '/booking-confirmation' } });
-    }
-  };
-
-  const calculateTotalCost = () => {
-    const packageCost = packageDetails.price;
-    const selectedGuideDetails = guides.find(g => g.id === selectedGuide);
-    const guideCost = selectedGuideDetails 
-      ? selectedGuideDetails.price_per_day * packageDetails.duration
-      : 0;
-    
-    return packageCost + guideCost;
-  };
+  const availableGuides = guides.filter(g => g.destination_id === packageDetails.destination_id);
 
   return (
     <div className="min-h-screen bg-gray-50 pt-24 pb-16">
@@ -151,6 +214,27 @@ const PackageDetailsPage: React.FC = () => {
                 />
               </div>
             </div>
+
+            {destinationPlaces.length > 0 && (
+              <div className="mt-8">
+                <h2 className="text-xl font-bold text-gray-800 mb-4">Places to Visit</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {destinationPlaces.map(place => (
+                    <div key={place.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                      <img 
+                        src={place.image_url} 
+                        alt={place.name}
+                        className="w-full h-48 object-cover"
+                      />
+                      <div className="p-4">
+                        <h3 className="font-bold text-gray-800 mb-2">{place.name}</h3>
+                        <p className="text-gray-600 text-sm">{place.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="lg:col-span-1">
@@ -213,6 +297,12 @@ const PackageDetailsPage: React.FC = () => {
                   </div>
                 </div>
 
+                {!guideAvailable && selectedGuide && startDate && (
+                  <div className="text-red-600 text-sm">
+                    This guide is not available for the selected dates.
+                  </div>
+                )}
+
                 <div className="pt-4 border-t border-gray-200">
                   <div className="flex justify-between mb-2">
                     <span>Package Price:</span>
@@ -235,11 +325,11 @@ const PackageDetailsPage: React.FC = () => {
                 <button
                   onClick={handleBookNow}
                   className={`w-full py-3 rounded-lg font-medium transition-colors ${
-                    !startDate || !selectedGuide
+                    !startDate || !selectedGuide || !guideAvailable
                       ? 'bg-gray-300 text-gray-700 cursor-not-allowed'
                       : 'bg-cyan-600 text-white hover:bg-cyan-700'
                   }`}
-                  disabled={!startDate || !selectedGuide}
+                  disabled={!startDate || !selectedGuide || !guideAvailable}
                 >
                   Book Now
                 </button>
@@ -312,9 +402,9 @@ const PackageDetailsPage: React.FC = () => {
               <h2 className="text-xl font-bold text-gray-800 mb-4">Day-by-Day Itinerary</h2>
               <div className="space-y-6">
                 {itinerary.map((day) => (
-                  <div key={day.day} className="border-l-4 border-cyan-600 pl-4">
+                  <div key={day.day_number} className="border-l-4 border-cyan-600 pl-4">
                     <h3 className="text-lg font-semibold text-gray-800 mb-1">
-                      Day {day.day}
+                      Day {day.day_number}
                     </h3>
                     <p className="text-gray-700">{day.description}</p>
                   </div>
