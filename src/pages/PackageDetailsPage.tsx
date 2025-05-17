@@ -8,8 +8,8 @@ import { supabase } from '../lib/supabase';
 
 interface Itinerary {
   id: string;
-  day_number: number;
-  description: string;
+  no_of_days: number;
+  description: string[];
 }
 
 const PackageDetailsPage: React.FC = () => {
@@ -67,7 +67,7 @@ const PackageDetailsPage: React.FC = () => {
         .from('package_itinerary')
         .select('*')
         .eq('package_id', packageId)
-        .order('day_number', { ascending: true });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       setItinerary(data || []);
@@ -363,36 +363,34 @@ const PackageDetailsPage: React.FC = () => {
             <div>
               <h2 className="text-xl font-bold text-gray-800 mb-4">Day-by-Day Itinerary</h2>
               
-
-  {loadingItinerary ? (
-  <div className="text-center py-8">
-    <p className="text-gray-600">Loading itinerary...</p>
-  </div>
-) : itineraryError ? (
-  <div className="text-center py-8">
-    <p className="text-red-600">{itineraryError}</p>
-  </div>
-) : itinerary.length === 0 ? (
-  <div className="text-center py-8">
-    <p className="text-gray-600">No itinerary details available</p>
-  </div>
-) : (
-  <div className="space-y-6">
-    {itinerary.map((item) => (
-      <div key={item.id} className="border-l-4 border-cyan-600 pl-4">
-        {[...Array(item.no_of_days)].map((_, index) => (
-          <div key={index} className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-1">
-              Day {index + 1}
-            </h3>
-            <p className="text-gray-700">{item.description[index]}</p>
-          </div>
-        ))}
-      </div>
-    ))}
-  </div>
-)}
-
+              {loadingItinerary ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">Loading itinerary...</p>
+                </div>
+              ) : itineraryError ? (
+                <div className="text-center py-8">
+                  <p className="text-red-600">{itineraryError}</p>
+                </div>
+              ) : itinerary.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">No itinerary details available</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {itinerary.map((item) => (
+                    <div key={item.id} className="border-l-4 border-cyan-600 pl-4">
+                      {item.description.map((desc, index) => (
+                        <div key={index} className="mb-4">
+                          <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                            Day {index + 1}
+                          </h3>
+                          <p className="text-gray-700">{desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
