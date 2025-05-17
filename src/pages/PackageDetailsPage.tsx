@@ -215,7 +215,7 @@ const PackageDetailsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* {destinationPlaces.length > 0 && (
+            {destinationPlaces.length > 0 && (
               <div className="mt-8">
                 <h2 className="text-xl font-bold text-gray-800 mb-4">Places to Visit</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -232,8 +232,7 @@ const PackageDetailsPage: React.FC = () => {
                       </div>
                     </div>
                   ))}
-                  */}
-                </div> 
+                </div>
               </div>
             )}
           </div>
