@@ -1,17 +1,50 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Clock, MapPin, Star } from 'lucide-react';
 import { useDestinations } from '../hooks/useDestinations';
 import { usePackages } from '../hooks/usePackages';
+import { supabase } from '../lib/supabase';
+
+interface DestinationPlace {
+  id: string;
+  name: string;
+  description: string;
+  image_url: string;
+}
 
 const PackagesPage: React.FC = () => {
   const { destinationId } = useParams<{ destinationId: string }>();
   const { destinations, loading: destinationsLoading, error: destinationsError } = useDestinations();
   const { packages, loading: packagesLoading, error: packagesError } = usePackages(destinationId);
+  const [places, setPlaces] = useState<DestinationPlace[]>([]);
+  const [loadingPlaces, setLoadingPlaces] = useState(true);
   
   const destination = destinations.find(d => d.id === destinationId);
 
-  if (destinationsLoading || packagesLoading) {
+  useEffect(() => {
+    if (destinationId) {
+      fetchDestinationPlaces();
+    }
+  }, [destinationId]);
+
+  const fetchDestinationPlaces = async () => {
+    try {
+      setLoadingPlaces(true);
+      const { data, error } = await supabase
+        .from('destination_places')
+        .select('*')
+        .eq('destination_id', destinationId);
+
+      if (error) throw error;
+      setPlaces(data || []);
+    } catch (err) {
+      console.error('Error fetching destination places:', err);
+    } finally {
+      setLoadingPlaces(false);
+    }
+  };
+
+  if (destinationsLoading || packagesLoading || loadingPlaces) {
     return (
       <div className="min-h-screen bg-gray-50 pt-24 pb-16 flex justify-center items-center">
         <div className="text-center">
@@ -61,6 +94,33 @@ const PackagesPage: React.FC = () => {
             <p className="text-lg max-w-2xl">{destination.description}</p>
           </div>
         </div>
+
+        {/* Places Section */}
+        {places.length > 0 && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Places to Visit</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {places.map((place) => (
+                <div 
+                  key={place.id}
+                  className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow"
+                >
+                  <div className="h-48">
+                    <img 
+                      src={place.image_url} 
+                      alt={place.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <h3 className="text-lg font-bold text-gray-800 mb-2">{place.name}</h3>
+                    <p className="text-gray-600">{place.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Packages Section */}
         <div className="mb-12">

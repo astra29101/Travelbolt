@@ -5,16 +5,9 @@ import { useAuth } from '../context/AuthContext';
 import { usePackages } from '../hooks/usePackages';
 import { useGuides } from '../hooks/useGuides';
 import { supabase } from '../lib/supabase';
-import type { Tables } from '../lib/supabase';
-
-interface DestinationPlace {
-  id: string;
-  name: string;
-  description: string;
-  image_url: string;
-}
 
 interface Itinerary {
+  id: string;
   day_number: number;
   description: string;
 }
@@ -26,7 +19,6 @@ const PackageDetailsPage: React.FC = () => {
   const [endDate, setEndDate] = useState<string>('');
   const [activeTab, setActiveTab] = useState('overview');
   const [mainImage, setMainImage] = useState('');
-  const [destinationPlaces, setDestinationPlaces] = useState<DestinationPlace[]>([]);
   const [itinerary, setItinerary] = useState<Itinerary[]>([]);
   const [guideAvailable, setGuideAvailable] = useState(true);
   const { user } = useAuth();
@@ -53,12 +45,6 @@ const PackageDetailsPage: React.FC = () => {
   }, [startDate, packageDetails?.duration]);
 
   useEffect(() => {
-    if (packageDetails?.destination_id) {
-      fetchDestinationPlaces();
-    }
-  }, [packageDetails?.destination_id]);
-
-  useEffect(() => {
     if (packageId) {
       fetchItinerary();
     }
@@ -69,20 +55,6 @@ const PackageDetailsPage: React.FC = () => {
       checkGuideAvailability();
     }
   }, [selectedGuide, startDate, endDate]);
-
-  const fetchDestinationPlaces = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('destination_places')
-        .select('*')
-        .eq('destination_id', packageDetails?.destination_id);
-
-      if (error) throw error;
-      setDestinationPlaces(data || []);
-    } catch (err) {
-      console.error('Error fetching destination places:', err);
-    }
-  };
 
   const fetchItinerary = async () => {
     try {
@@ -105,8 +77,7 @@ const PackageDetailsPage: React.FC = () => {
         .from('bookings')
         .select('*')
         .eq('guide_id', selectedGuide)
-        .overlaps('start_date', [startDate])
-        .overlaps('end_date', [endDate]);
+        .or(`start_date.lte.${endDate},end_date.gte.${startDate}`);
 
       if (error) throw error;
       setGuideAvailable(!existingBookings?.length);
@@ -214,27 +185,6 @@ const PackageDetailsPage: React.FC = () => {
                 />
               </div>
             </div>
-
-            {destinationPlaces.length > 0 && (
-              <div className="mt-8">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">Places to Visit</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {destinationPlaces.map(place => (
-                    <div key={place.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-                      <img 
-                        src={place.image_url} 
-                        alt={place.name}
-                        className="w-full h-48 object-cover"
-                      />
-                      <div className="p-4">
-                        <h3 className="font-bold text-gray-800 mb-2">{place.name}</h3>
-                        <p className="text-gray-600 text-sm">{place.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="lg:col-span-1">
@@ -402,7 +352,7 @@ const PackageDetailsPage: React.FC = () => {
               <h2 className="text-xl font-bold text-gray-800 mb-4">Day-by-Day Itinerary</h2>
               <div className="space-y-6">
                 {itinerary.map((day) => (
-                  <div key={day.day_number} className="border-l-4 border-cyan-600 pl-4">
+                  <div key={day.id} className="border-l-4 border-cyan-600 pl-4">
                     <h3 className="text-lg font-semibold text-gray-800 mb-1">
                       Day {day.day_number}
                     </h3>
