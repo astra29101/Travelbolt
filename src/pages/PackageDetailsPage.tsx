@@ -363,30 +363,36 @@ const PackageDetailsPage: React.FC = () => {
             <div>
               <h2 className="text-xl font-bold text-gray-800 mb-4">Day-by-Day Itinerary</h2>
               
-              {loadingItinerary ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-600">Loading itinerary...</p>
-                </div>
-              ) : itineraryError ? (
-                <div className="text-center py-8">
-                  <p className="text-red-600">{itineraryError}</p>
-                </div>
-              ) : itinerary.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-600">No itinerary details available</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {itinerary.map((day) => (
-                    <div key={day.id} className="border-l-4 border-cyan-600 pl-4">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-1">
-                        Day {day.day_number}
-                      </h3>
-                      <p className="text-gray-700">{day.description}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
+
+  {loadingItinerary ? (
+  <div className="text-center py-8">
+    <p className="text-gray-600">Loading itinerary...</p>
+  </div>
+) : itineraryError ? (
+  <div className="text-center py-8">
+    <p className="text-red-600">{itineraryError}</p>
+  </div>
+) : itinerary.length === 0 ? (
+  <div className="text-center py-8">
+    <p className="text-gray-600">No itinerary details available</p>
+  </div>
+) : (
+  <div className="space-y-6">
+    {itinerary.map((item) => (
+      <div key={item.id} className="border-l-4 border-cyan-600 pl-4">
+        {[...Array(item.no_of_days)].map((_, index) => (
+          <div key={index} className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-800 mb-1">
+              Day {index + 1}
+            </h3>
+            <p className="text-gray-700">{item.description[index]}</p>
+          </div>
+        ))}
+      </div>
+    ))}
+  </div>
+)}
+
             </div>
           )}
         </div>
