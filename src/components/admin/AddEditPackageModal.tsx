@@ -64,18 +64,13 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
       const { data, error } = await supabase
         .from('package_itinerary')
         .select('*')
-        .eq('package_id', pkg.id)
-        .order('day_number', { ascending: true });
+        .eq('package_id', pkg.id);
 
       if (error) throw error;
-
+      
       if (data && data.length > 0) {
-        // Map the descriptions from the array of itinerary entries
-        const descriptions = data.map(item => item.description);
-        setItineraryDescriptions(descriptions);
-      } else {
-        // Initialize with empty array if no itinerary exists
-        setItineraryDescriptions([]);
+        // Use the first entry's description array since it contains all days
+        setItineraryDescriptions(data[0].description || []);
       }
     } catch (err) {
       console.error('Error fetching itinerary:', err);
@@ -128,29 +123,30 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
 
       const savedPackage = await onSave(packageData);
 
-      // Prepare itinerary data
-      const itineraryData = itineraryDescriptions.map((description, index) => ({
-        package_id: savedPackage.id,
-        day_number: index + 1,
-        description
-      }));
-
+      // Handle itinerary
       if (pkg?.id) {
-        // Delete existing itinerary entries
-        const { error: deleteError } = await supabase
+        // Update existing itinerary
+        const { error: itineraryError } = await supabase
           .from('package_itinerary')
-          .delete()
+          .update({
+            no_of_days: parseInt(duration),
+            description: itineraryDescriptions
+          })
           .eq('package_id', pkg.id);
 
-        if (deleteError) throw deleteError;
+        if (itineraryError) throw itineraryError;
+      } else {
+        // Create new itinerary
+        const { error: itineraryError } = await supabase
+          .from('package_itinerary')
+          .insert([{
+            package_id: savedPackage.id,
+            no_of_days: parseInt(duration),
+            description: itineraryDescriptions
+          }]);
+
+        if (itineraryError) throw itineraryError;
       }
-
-      // Insert new itinerary entries
-      const { error: insertError } = await supabase
-        .from('package_itinerary')
-        .insert(itineraryData);
-
-      if (insertError) throw insertError;
 
       onClose();
     } catch (err) {
