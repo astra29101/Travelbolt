@@ -18,9 +18,9 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
   const [price, setPrice] = useState(pkg?.price?.toString() || '');
   const [mainImageUrl, setMainImageUrl] = useState(pkg?.main_image_url || '');
   const [selectedDestinationId, setSelectedDestinationId] = useState(initialDestinationId || pkg?.destination_id || '');
-  const [itinerary, setItinerary] = useState(pkg?.itinerary || '');
   const [availablePlaces, setAvailablePlaces] = useState<Tables['destination_places'][]>([]);
   const [selectedPlaces, setSelectedPlaces] = useState<string[]>([]);
+  const [itineraryDescriptions, setItineraryDescriptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -31,6 +31,24 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
       fetchPlaces();
     }
   }, [selectedDestinationId]);
+
+  useEffect(() => {
+    // Initialize or update itinerary descriptions array when duration changes
+    const days = parseInt(duration) || 0;
+    setItineraryDescriptions(prev => {
+      const newDescriptions = [...prev];
+      if (days > prev.length) {
+        // Add empty descriptions for new days
+        for (let i = prev.length; i < days; i++) {
+          newDescriptions.push('');
+        }
+      } else if (days < prev.length) {
+        // Remove descriptions for removed days
+        newDescriptions.splice(days);
+      }
+      return newDescriptions;
+    });
+  }, [duration]);
 
   const fetchPlaces = async () => {
     try {
@@ -58,6 +76,7 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
     }
 
     try {
+      // First save the package
       const packageData = {
         destination_id: selectedDestinationId,
         title,
@@ -65,11 +84,24 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
         duration: parseInt(duration),
         price: parseFloat(price),
         rating: pkg?.rating || 0,
-        main_image_url: mainImageUrl,
-        itinerary
+        main_image_url: mainImageUrl
       };
 
-      await onSave(packageData);
+      const savedPackage = await onSave(packageData);
+
+      // Then save the itinerary
+      if (savedPackage) {
+        const { error: itineraryError } = await supabase
+          .from('package_itinerary')
+          .insert([{
+            package_id: savedPackage.id,
+            no_of_days: parseInt(duration),
+            description: itineraryDescriptions
+          }]);
+
+        if (itineraryError) throw itineraryError;
+      }
+
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -84,6 +116,14 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
         ? prev.filter(id => id !== placeId)
         : [...prev, placeId]
     );
+  };
+
+  const handleItineraryChange = (index: number, value: string) => {
+    setItineraryDescriptions(prev => {
+      const newDescriptions = [...prev];
+      newDescriptions[index] = value;
+      return newDescriptions;
+    });
   };
 
   return (
@@ -195,17 +235,26 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Itinerary
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Day-by-Day Itinerary
             </label>
-            <textarea
-              value={itinerary}
-              onChange={(e) => setItinerary(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-              rows={5}
-              placeholder="Day-by-day itinerary details..."
-              required
-            />
+            <div className="space-y-4">
+              {itineraryDescriptions.map((desc, index) => (
+                <div key={index}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Day {index + 1}
+                  </label>
+                  <textarea
+                    value={desc}
+                    onChange={(e) => handleItineraryChange(index, e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg"
+                    rows={2}
+                    placeholder={`Enter itinerary for day ${index + 1}`}
+                    required
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
           <div>
