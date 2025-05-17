@@ -69,7 +69,6 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
       if (error) throw error;
       
       if (data && data.length > 0) {
-        // Use the first entry's description array since it contains all days
         setItineraryDescriptions(data[0].description || []);
       }
     } catch (err) {
@@ -124,14 +123,17 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
       const savedPackage = await onSave(packageData);
 
       // Handle itinerary
+      const itineraryData = {
+        package_id: savedPackage.id,
+        no_of_days: parseInt(duration),
+        description: itineraryDescriptions
+      };
+
       if (pkg?.id) {
         // Update existing itinerary
         const { error: itineraryError } = await supabase
           .from('package_itinerary')
-          .update({
-            no_of_days: parseInt(duration),
-            description: itineraryDescriptions
-          })
+          .update(itineraryData)
           .eq('package_id', pkg.id);
 
         if (itineraryError) throw itineraryError;
@@ -139,11 +141,7 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
         // Create new itinerary
         const { error: itineraryError } = await supabase
           .from('package_itinerary')
-          .insert([{
-            package_id: savedPackage.id,
-            no_of_days: parseInt(duration),
-            description: itineraryDescriptions
-          }]);
+          .insert([itineraryData]);
 
         if (itineraryError) throw itineraryError;
       }
