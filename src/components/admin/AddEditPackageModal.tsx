@@ -8,7 +8,7 @@ interface Props {
   package?: Tables['packages'];
   destinationId?: string;
   onClose: () => void;
-  onSave: (pkg: Omit<Tables['packages'], 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  onSave: (pkg: Omit<Tables['packages'], 'id' | 'created_at' | 'updated_at'>) => Promise<Tables['packages']>;
 }
 
 export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destinationId: initialDestinationId, onClose, onSave }) => {
@@ -50,6 +50,32 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
     });
   }, [duration]);
 
+  // Fetch existing itinerary if editing
+  useEffect(() => {
+    if (pkg?.id) {
+      fetchExistingItinerary();
+    }
+  }, [pkg?.id]);
+
+  const fetchExistingItinerary = async () => {
+    if (!pkg?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('package_itinerary')
+        .select('*')
+        .eq('package_id', pkg.id)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setItineraryDescriptions(data.description);
+      }
+    } catch (err) {
+      console.error('Error fetching itinerary:', err);
+    }
+  };
+
   const fetchPlaces = async () => {
     try {
       const { data, error } = await supabase
@@ -75,6 +101,13 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
       return;
     }
 
+    // Validate itinerary descriptions
+    if (itineraryDescriptions.some(desc => !desc.trim())) {
+      setError('Please fill in all itinerary descriptions');
+      setLoading(false);
+      return;
+    }
+
     try {
       // First save the package
       const packageData = {
@@ -89,8 +122,20 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
 
       const savedPackage = await onSave(packageData);
 
-      // Then save the itinerary
-      if (savedPackage) {
+      // Then handle the itinerary
+      if (pkg?.id) {
+        // Update existing itinerary
+        const { error: itineraryError } = await supabase
+          .from('package_itinerary')
+          .update({
+            no_of_days: parseInt(duration),
+            description: itineraryDescriptions
+          })
+          .eq('package_id', pkg.id);
+
+        if (itineraryError) throw itineraryError;
+      } else {
+        // Create new itinerary
         const { error: itineraryError } = await supabase
           .from('package_itinerary')
           .insert([{

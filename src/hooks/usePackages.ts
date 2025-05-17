@@ -39,7 +39,7 @@ export function usePackages(destinationId?: string) {
 
       if (error) throw error;
       setPackages(prev => [data, ...prev]);
-      return data;
+      return data; // Return the newly created package
     } catch (err) {
       console.error('Error adding package:', err);
       throw err;
@@ -57,7 +57,7 @@ export function usePackages(destinationId?: string) {
 
       if (error) throw error;
       setPackages(prev => prev.map(p => p.id === id ? data : p));
-      return data;
+      return data; // Return the updated package
     } catch (err) {
       console.error('Error updating package:', err);
       throw err;
