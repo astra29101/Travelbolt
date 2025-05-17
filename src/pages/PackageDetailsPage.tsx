@@ -21,6 +21,8 @@ const PackageDetailsPage: React.FC = () => {
   const [mainImage, setMainImage] = useState('');
   const [itinerary, setItinerary] = useState<Itinerary[]>([]);
   const [guideAvailable, setGuideAvailable] = useState(true);
+  const [loadingItinerary, setLoadingItinerary] = useState(true);
+  const [itineraryError, setItineraryError] = useState<string | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -58,31 +60,41 @@ const PackageDetailsPage: React.FC = () => {
 
   const fetchItinerary = async () => {
     try {
+      setLoadingItinerary(true);
+      setItineraryError(null);
+
       const { data, error } = await supabase
         .from('package_itinerary')
         .select('*')
         .eq('package_id', packageId)
-        .order('day_number');
+        .order('day_number', { ascending: true });
 
       if (error) throw error;
       setItinerary(data || []);
     } catch (err) {
       console.error('Error fetching itinerary:', err);
+      setItineraryError('Failed to load itinerary details');
+    } finally {
+      setLoadingItinerary(false);
     }
   };
 
   const checkGuideAvailability = async () => {
+    if (!selectedGuide || !startDate || !endDate) return;
+
     try {
       const { data: existingBookings, error } = await supabase
         .from('bookings')
         .select('*')
         .eq('guide_id', selectedGuide)
+        .eq('status', 'confirmed')
         .or(`start_date.lte.${endDate},end_date.gte.${startDate}`);
 
       if (error) throw error;
       setGuideAvailable(!existingBookings?.length);
     } catch (err) {
       console.error('Error checking guide availability:', err);
+      setGuideAvailable(false);
     }
   };
 
@@ -350,16 +362,31 @@ const PackageDetailsPage: React.FC = () => {
           {activeTab === 'itinerary' && (
             <div>
               <h2 className="text-xl font-bold text-gray-800 mb-4">Day-by-Day Itinerary</h2>
-              <div className="space-y-6">
-                {itinerary.map((day) => (
-                  <div key={day.id} className="border-l-4 border-cyan-600 pl-4">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-1">
-                      Day {day.day_number}
-                    </h3>
-                    <p className="text-gray-700">{day.description}</p>
-                  </div>
-                ))}
-              </div>
+              
+              {loadingItinerary ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">Loading itinerary...</p>
+                </div>
+              ) : itineraryError ? (
+                <div className="text-center py-8">
+                  <p className="text-red-600">{itineraryError}</p>
+                </div>
+              ) : itinerary.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">No itinerary details available</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {itinerary.map((day) => (
+                    <div key={day.id} className="border-l-4 border-cyan-600 pl-4">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                        Day {day.day_number}
+                      </h3>
+                      <p className="text-gray-700">{day.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
