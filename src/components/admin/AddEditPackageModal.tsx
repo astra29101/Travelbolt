@@ -65,11 +65,17 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
         .from('package_itinerary')
         .select('*')
         .eq('package_id', pkg.id)
-        .single();
+        .order('day_number', { ascending: true });
 
       if (error) throw error;
-      if (data) {
-        setItineraryDescriptions(data.description);
+
+      if (data && data.length > 0) {
+        // Map the descriptions from the array of itinerary entries
+        const descriptions = data.map(item => item.description);
+        setItineraryDescriptions(descriptions);
+      } else {
+        // Initialize with empty array if no itinerary exists
+        setItineraryDescriptions([]);
       }
     } catch (err) {
       console.error('Error fetching itinerary:', err);
@@ -122,30 +128,29 @@ export const AddEditPackageModal: React.FC<Props> = ({ package: pkg, destination
 
       const savedPackage = await onSave(packageData);
 
-      // Then handle the itinerary
+      // Prepare itinerary data
+      const itineraryData = itineraryDescriptions.map((description, index) => ({
+        package_id: savedPackage.id,
+        day_number: index + 1,
+        description
+      }));
+
       if (pkg?.id) {
-        // Update existing itinerary
-        const { error: itineraryError } = await supabase
+        // Delete existing itinerary entries
+        const { error: deleteError } = await supabase
           .from('package_itinerary')
-          .update({
-            no_of_days: parseInt(duration),
-            description: itineraryDescriptions
-          })
+          .delete()
           .eq('package_id', pkg.id);
 
-        if (itineraryError) throw itineraryError;
-      } else {
-        // Create new itinerary
-        const { error: itineraryError } = await supabase
-          .from('package_itinerary')
-          .insert([{
-            package_id: savedPackage.id,
-            no_of_days: parseInt(duration),
-            description: itineraryDescriptions
-          }]);
-
-        if (itineraryError) throw itineraryError;
+        if (deleteError) throw deleteError;
       }
+
+      // Insert new itinerary entries
+      const { error: insertError } = await supabase
+        .from('package_itinerary')
+        .insert(itineraryData);
+
+      if (insertError) throw insertError;
 
       onClose();
     } catch (err) {
