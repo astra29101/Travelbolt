@@ -232,11 +232,11 @@ const PackageDetailsPage: React.FC = () => {
                       </div>
                     </div>
                   ))}
-                </div>
+                </div> */}
               </div>
             )}
           </div>
- */}
+
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl shadow-md p-6 sticky top-24">
               <div className="mb-6">
